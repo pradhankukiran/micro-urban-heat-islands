@@ -103,9 +103,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden">
+    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden h-[468px] md:h-[584px] flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-700 to-slate-800 p-4">
+      <div className="bg-gradient-to-r from-slate-700 to-slate-800 p-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Settings className="w-5 h-5 text-white" />
           <h3 className="text-lg font-semibold text-white">MUHI Analysis Controls</h3>
@@ -115,7 +115,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      <div className="max-h-[600px] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-4">
 
           {/* Temporal Controls */}

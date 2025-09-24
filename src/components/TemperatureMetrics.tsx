@@ -102,8 +102,8 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ selectedDate, i
   ];
 
   return (
-    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-red-500 to-orange-500 p-4">
+    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden h-[600px] flex flex-col">
+      <div className="bg-gradient-to-r from-red-500 to-orange-500 p-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-white" />
           <h3 className="text-lg font-semibold text-white">Research Metrics</h3>
@@ -114,26 +114,26 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ selectedDate, i
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200">
+      <div className="border-b border-slate-200 flex-shrink-0">
         <div className="flex">
           {sections.map(section => (
             <button
               key={section.id}
               onClick={() => setActiveSection(section.id as any)}
-              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-4 py-3 text-sm font-medium transition-colors ${
                 activeSection === section.id
                   ? 'border-b-2 border-red-500 text-red-600 bg-red-50'
                   : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <section.icon className="w-3 h-3" />
+              <section.icon className="w-4 h-4" />
               {section.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 flex-1 overflow-y-auto">
 
         {/* MUHI Statistics */}
         {activeSection === 'muhi' && (

@@ -93,8 +93,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   ];
 
   return (
-    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-600 to-orange-600 p-4">
+    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden h-[600px] flex flex-col">
+      <div className="bg-gradient-to-r from-blue-600 to-orange-600 p-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-white" />
           <h3 className="text-lg font-semibold text-white">MUHI Research Analytics</h3>
@@ -105,7 +105,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200">
+      <div className="border-b border-slate-200 flex-shrink-0">
         <div className="flex overflow-x-auto">
           {tabs.map(tab => (
             <button
@@ -124,7 +124,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-6 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-4">
