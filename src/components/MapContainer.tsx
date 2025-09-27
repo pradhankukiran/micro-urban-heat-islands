@@ -8,8 +8,6 @@ interface MapContainerProps {
     lstVisible: boolean;
     muhiCanopy40: boolean;
     muhiTop2Percent: boolean;
-    groundTruth: boolean;
-    landCover: boolean;
   };
   queryMode: boolean;
   onMapClick?: (lat: number, lng: number) => void | Promise<void>;
@@ -29,8 +27,6 @@ const MapContainer: React.FC<MapContainerProps> = ({
     lst?: any;
     muhiCanopy40?: any;
     muhiTop2Percent?: any;
-    groundTruth?: any;
-    landCover?: any;
   }>({});
 
   // Map initialization
@@ -53,9 +49,7 @@ const MapContainer: React.FC<MapContainerProps> = ({
     layerGroupsRef.current = {
       lst: L.layerGroup().addTo(map),
       muhiCanopy40: L.layerGroup().addTo(map),
-      muhiTop2Percent: L.layerGroup().addTo(map),
-      groundTruth: L.layerGroup().addTo(map),
-      landCover: L.layerGroup().addTo(map)
+      muhiTop2Percent: L.layerGroup().addTo(map)
     };
 
     mapInstanceRef.current = map;
@@ -238,37 +232,7 @@ const MapContainer: React.FC<MapContainerProps> = ({
       layerGroups.muhiTop2Percent.addTo(map);
     }
 
-    // Ground truth layer using real data
-    clearLayerGroup('groundTruth');
-    if (layers.groundTruth && dataset?.groundTruthStations) {
-      dataset.groundTruthStations.forEach(station => {
-        const temp = station.temperatures[selectedDate];
-        const lstTemp = station.lstTemperatures[selectedDate];
-        if (temp === undefined || temp === null) return;
-        const marker = (window as any).L.circleMarker([station.lat, station.lng], {
-          radius: 6,
-          fillColor: '#4F46E5',
-          color: '#312E81',
-          weight: 2,
-          opacity: 1,
-          fillOpacity: 0.8
-        });
-        const difference = lstTemp !== undefined ? Math.abs(temp - lstTemp) : null;
-        marker.bindPopup(`
-          <div class="text-sm">
-            <div class="font-semibold text-slate-800">${station.name}</div>
-            <div class="text-slate-600">Ground Truth: ${temp.toFixed(1)}°C</div>
-            ${lstTemp !== undefined ? `<div class="text-slate-600">LST: ${lstTemp.toFixed(1)}°C</div>` : ''}
-            ${difference !== null ? `<div class="text-slate-500">Δ${difference.toFixed(1)}°C</div>` : ''}
-            <div class="text-xs text-slate-500 mt-1">Station ID: ${station.stationId}</div>
-            <div class="text-xs text-slate-500">Type: ${station.type} | Elevation: ${station.elevation}m</div>
-            <div class="text-xs text-slate-500">Accuracy: ${station.accuracy} | Quality: ${station.dataQuality}%</div>
-          </div>
-        `);
-        marker.addTo(layerGroups.groundTruth);
-      });
-      layerGroups.groundTruth.addTo(map);
-    }
+
   }, [layers, dataset, selectedDate]);
 
   const statistics = dataset?.manifest.raster.statistics;
@@ -309,12 +273,6 @@ const MapContainer: React.FC<MapContainerProps> = ({
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500" />
               <span className="text-xs text-slate-600">MUHI Top 2% ({dataset.manifest.thresholds.top2percent.areaHa.toLocaleString(undefined, { maximumFractionDigits: 1 })} ha)</span>
-            </div>
-          )}
-          {layers.groundTruth && (
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-indigo-600 rounded-full" />
-              <span className="text-xs text-slate-600">Weather Stations ({dataset?.groundTruthStations?.length ?? 0})</span>
             </div>
           )}
         </div>

@@ -21,7 +21,7 @@ interface QueryData {
   lat: number;
   lng: number;
   temperature: number;
-  landCover: string;
+  classification: string;
   muhiStatus: string[];
   canopyHits: QueryFeatureDetail[];
   top2Hits: QueryFeatureDetail[];
@@ -48,23 +48,14 @@ const InteractiveQuery: React.FC<InteractiveQueryProps> = ({
     return null;
   }
 
-  const getLandCoverColor = (landCover: string): string => {
-    switch (landCover) {
-      case 'Buildings':
+  const getClassificationColor = (classification: string): string => {
+    switch (classification) {
       case 'Hotspot':
         return '#8B4513';
-      case 'Concrete':
-        return '#708090';
-      case 'Dense Vegetation':
-        return '#228B22';
-      case 'Sparse Vegetation':
-        return '#9ACD32';
-      case 'Unvegetated Asphalt':
-        return '#2F4F4F';
-      case 'Vegetated Asphalt':
-        return '#696969';
-      case 'Water Body':
-        return '#4682B4';
+      case 'Background':
+        return '#2563eb';
+      case 'Outside coverage':
+        return '#94a3b8';
       default:
         return '#94a3b8';
     }
@@ -164,17 +155,17 @@ const InteractiveQuery: React.FC<InteractiveQueryProps> = ({
           <div className="bg-slate-50 p-4 border border-slate-200">
             <div className="flex items-center gap-2 mb-3">
               <TreePine className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-semibold text-slate-700">Land Cover Classification</span>
+              <span className="text-sm font-semibold text-slate-700">Location Classification</span>
             </div>
             <div className="flex items-center gap-3">
               <div
                 className="w-4 h-4 rounded"
-                style={{ backgroundColor: getLandCoverColor(queryData.landCover) }}
+                style={{ backgroundColor: getClassificationColor(queryData.classification) }}
               />
-              <span className="text-sm font-medium text-slate-800">{queryData.landCover}</span>
+              <span className="text-sm font-medium text-slate-800">{queryData.classification}</span>
             </div>
             <div className="text-xs text-slate-600 mt-2">
-              Real-time classification based on land cover polygons.
+              Derived from MUHI hotspot overlap.
             </div>
           </div>
 

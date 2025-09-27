@@ -16,7 +16,18 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-import type { LandCoverCategory } from '../services/dataset';
+interface LandCoverCategory {
+  id: string;
+  name: string;
+  code: number;
+  area: number;
+  color: string;
+  muhiContribution: {
+    canopy40: number;
+    top2percent: number;
+  };
+  description: string;
+}
 
 interface LandCoverCategoryState extends LandCoverCategory {
   visible: boolean;

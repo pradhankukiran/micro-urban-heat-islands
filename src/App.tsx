@@ -6,8 +6,6 @@ import DataVisualization from './components/DataVisualization';
 import ResearchInfo from './components/ResearchInfo';
 import TemperatureMetrics from './components/TemperatureMetrics';
 import InteractiveQuery from './components/InteractiveQuery';
-import GroundTruthStations from './components/GroundTruthStations';
-import LandCoverOverlay from './components/LandCoverOverlay';
 import StatisticalDashboard from './components/StatisticalDashboard';
 import {
   fetchSceneIndex,
@@ -22,8 +20,6 @@ interface LayerState {
   lstVisible: boolean;
   muhiCanopy40: boolean;
   muhiTop2Percent: boolean;
-  groundTruth: boolean;
-  landCover: boolean;
 }
 
 interface QueryFeatureDetail {
@@ -37,30 +33,14 @@ interface QueryData {
   lat: number;
   lng: number;
   temperature: number;
-  landCover: string;
+  classification: string;
   muhiStatus: string[];
   canopyHits: QueryFeatureDetail[];
   top2Hits: QueryFeatureDetail[];
 }
 
-interface WeatherStation {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  elevation: number;
-  type: 'PWS' | 'NOAA';
-  temperature: Record<string, number>;
-  lstTemperature: Record<string, number>;
-  accuracy: 'High' | 'Medium' | 'Low';
-  dataQuality: number;
-  lastUpdate: string;
-}
-
 interface LayoutState {
   showStatistics: boolean;
-  showGroundTruth: boolean;
-  showLandCover: boolean;
   showDashboard: boolean;
   queryMode: boolean;
 }
@@ -69,24 +49,19 @@ function App() {
   const [sceneOptions, setSceneOptions] = useState<SceneInfo[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [dataset, setDataset] = useState<SceneDataset | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerState>({
     lstVisible: true,
     muhiCanopy40: true,
-    muhiTop2Percent: true,
-    groundTruth: false,
-    landCover: false
+    muhiTop2Percent: true
   });
   const [layout, setLayout] = useState<LayoutState>({
     showStatistics: true,
-    showGroundTruth: false,
-    showLandCover: false,
     showDashboard: false,
     queryMode: false
   });
   const [queryData, setQueryData] = useState<QueryData | null>(null);
-  const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Load scene index on mount
@@ -115,11 +90,15 @@ function App() {
   // Load dataset when selected date changes
   useEffect(() => {
     if (!selectedDate) return;
-    const scene = sceneOptions.find(item => item.date === selectedDate);
-    if (!scene) return;
 
     let cancelled = false;
     setIsLoading(true);
+
+    const scene = sceneOptions.find(item => item.date === selectedDate);
+    if (!scene) {
+      setIsLoading(false);
+      return;
+    }
     setDataError(null);
     setDataset(null);
 
@@ -151,7 +130,7 @@ function App() {
         lat,
         lng,
         temperature: NaN,
-        landCover: 'Outside coverage',
+        classification: 'Outside coverage',
         muhiStatus: ['No data available'],
         canopyHits: [],
         top2Hits: []
@@ -204,37 +183,19 @@ function App() {
     if (top2Hit) status.push('Top 2% threshold');
     if (!status.length) status.push('Below MUHI thresholds');
 
-    // Query land cover classification
-    let landCoverType = 'Unknown';
-    if (dataset.landCover?.features) {
-      for (const feature of dataset.landCover.features) {
-        if (booleanPointInPolygon(point, feature as any)) {
-          landCoverType = feature.properties?.name || 'Unknown';
-          break;
-        }
-      }
-    }
-
-    // Fallback to simple classification if no land cover polygon match
-    if (landCoverType === 'Unknown') {
-      landCoverType = canopyHit || top2Hit ? 'Hotspot' : 'Background';
-    }
+    const classification = canopyHit || top2Hit ? 'Hotspot' : 'Background';
 
     setQueryData({
       lat,
       lng,
       temperature: roundedTemperature,
-      landCover: landCoverType,
+      classification,
       muhiStatus: status,
       canopyHits: canopyMatches,
       top2Hits: top2Matches
     });
   }, [layout.queryMode, dataset]);
 
-
-  const handleStationSelect = useCallback((station: WeatherStation) => {
-    setSelectedStation(station);
-  }, []);
 
   const handleDataExport = useCallback(() => {
     if (!dataset) {
@@ -258,8 +219,6 @@ function App() {
   }, [dataset]);
 
   const toggleStatistics = () => setLayout(prev => ({ ...prev, showStatistics: !prev.showStatistics }));
-  const toggleGroundTruth = () => setLayout(prev => ({ ...prev, showGroundTruth: !prev.showGroundTruth }));
-  const toggleLandCover = () => setLayout(prev => ({ ...prev, showLandCover: !prev.showLandCover }));
   const toggleDashboard = () => setLayout(prev => ({ ...prev, showDashboard: !prev.showDashboard }));
   const toggleQueryMode = () => setLayout(prev => ({ ...prev, queryMode: !prev.queryMode }));
 
@@ -273,135 +232,123 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
       <Header />
 
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <div className="bg-white shadow-xl overflow-hidden border border-slate-200">
-              <div className="bg-gradient-to-r from-blue-600 to-orange-600 p-4">
-                <h2 className="text-xl font-bold text-white">
-                  Micro-Urban Heat Islands Analysis – {currentSceneLabel}
-                </h2>
-                <p className="text-blue-100 text-sm mt-1">
-                  Landsat 8 Collection 2 Level 2 | NDVI → Emissivity → LST
-                </p>
-                {lastRefresh && (
-                  <p className="text-[11px] text-blue-200 mt-1">Loaded {lastRefresh.toLocaleTimeString()}</p>
-                )}
-                {dataError && (
-                  <p className="text-[11px] text-red-200 mt-1">{dataError}</p>
-                )}
+      <div className="relative">
+        <main className="container mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              <div className="bg-white shadow-xl overflow-hidden border border-slate-200">
+                <div className="bg-gradient-to-r from-blue-600 to-orange-600 p-4">
+                  <h2 className="text-xl font-bold text-white">
+                    Micro-Urban Heat Islands Analysis - {currentSceneLabel}
+                  </h2>
+                  <p className="text-blue-100 text-sm mt-1">
+                    Landsat 8 Collection 2 Level 2 | NDVI  Emissivity  LST
+                  </p>
+                  {lastRefresh && (
+                    <p className="text-[11px] text-blue-200 mt-1">Loaded {lastRefresh.toLocaleTimeString()}</p>
+                  )}
+                  {dataError && (
+                    <p className="text-[11px] text-red-200 mt-1">{dataError}</p>
+                  )}
+                </div>
+                <MapContainer
+                  selectedDate={selectedDate}
+                  layers={layers}
+                  queryMode={layout.queryMode}
+                  onMapClick={handleMapClick}
+                  dataset={dataset}
+                />
               </div>
-              <MapContainer
+            </div>
+
+            <div className="lg:col-span-1 space-y-6">
+              <ControlPanel
                 selectedDate={selectedDate}
+                scenes={sceneOptions}
+                manifest={dataset?.manifest}
+                setSelectedDate={setSelectedDate}
                 layers={layers}
+                setLayers={setLayers}
                 queryMode={layout.queryMode}
-                onMapClick={handleMapClick}
-                dataset={dataset}
-              />
-            </div>
-          </div>
-
-          <div className="lg:col-span-1 space-y-6">
-            <ControlPanel
-              selectedDate={selectedDate}
-              scenes={sceneOptions}
-              manifest={dataset?.manifest}
-              setSelectedDate={setSelectedDate}
-              layers={layers}
-              setLayers={setLayers}
-              queryMode={layout.queryMode}
-              setQueryMode={toggleQueryMode}
-              showStatistics={layout.showStatistics}
-              setShowStatistics={toggleStatistics}
-              isDatasetLoading={isLoading}
-              onExportData={handleDataExport}
-            />
-
-            {layout.showGroundTruth && (
-              <GroundTruthStations
-                selectedDate={selectedDate}
-                isVisible={layout.showGroundTruth}
-                onToggleVisibility={toggleGroundTruth}
-                onStationSelect={handleStationSelect}
-                stations={dataset?.groundTruthStations}
-              />
-            )}
-
-            {layout.showLandCover && (
-              <LandCoverOverlay
-                selectedDate={selectedDate}
-                isVisible={layout.showLandCover}
-                onToggleVisibility={toggleLandCover}
-                categories={dataset?.landCoverCategories}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="mt-8 space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <DataVisualization
-                dataset={dataset}
-                isLoading={isLoading}
-              />
-            </div>
-
-            <div className="xl:col-span-1">
-              <TemperatureMetrics
-                dataset={dataset}
-                isLoading={isLoading}
-              />
-            </div>
-          </div>
-
-          {layout.showDashboard && (
-            <div className="grid grid-cols-1 gap-6">
-              <StatisticalDashboard
-                dataset={dataset}
-                isVisible={layout.showDashboard}
-                onToggleVisibility={toggleDashboard}
+                setQueryMode={toggleQueryMode}
+                showStatistics={layout.showStatistics}
+                setShowStatistics={toggleStatistics}
+                isDatasetLoading={isLoading}
                 onExportData={handleDataExport}
               />
             </div>
-          )}
-
-          <div className="flex flex-wrap gap-3 justify-center">
-            <button
-              onClick={toggleGroundTruth}
-              className={`px-4 py-2 text-sm font-medium border transition-colors ${
-                layout.showGroundTruth
-                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Ground Truth Stations
-            </button>
-            <button
-              onClick={toggleLandCover}
-              className={`px-4 py-2 text-sm font-medium border transition-colors ${
-                layout.showLandCover
-                  ? 'bg-green-100 text-green-700 border-green-300'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Land Cover Analysis
-            </button>
-            <button
-              onClick={toggleDashboard}
-              className={`px-4 py-2 text-sm font-medium border transition-colors ${
-                layout.showDashboard
-                  ? 'bg-purple-100 text-purple-700 border-purple-300'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Statistical Dashboard
-            </button>
           </div>
-        </div>
 
-        
-      </main>
+          <div className="mt-8 space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <DataVisualization
+                  dataset={dataset}
+                  isLoading={isLoading}
+                />
+              </div>
+
+              <div className="xl:col-span-1">
+                <TemperatureMetrics
+                  dataset={dataset}
+                  isLoading={isLoading}
+                />
+              </div>
+            </div>
+
+                        <ResearchInfo />
+
+            {layout.showDashboard && (
+              <div className="grid grid-cols-1 gap-6">
+                <StatisticalDashboard
+                  dataset={dataset}
+                  isVisible={layout.showDashboard}
+                  onToggleVisibility={toggleDashboard}
+                  onExportData={handleDataExport}
+                />
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 justify-center">
+              <button
+                onClick={toggleDashboard}
+                className={`px-4 py-2 text-sm font-medium border transition-colors ${
+                  layout.showDashboard
+                    ? 'bg-purple-100 text-purple-700 border-purple-300'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Statistical Dashboard
+              </button>
+            </div>
+          </div>
+        </main>
+
+        {isLoading && (
+          <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/45 backdrop-blur-sm">
+            <div
+              role="status"
+              aria-live="assertive"
+              className="max-w-lg w-full mx-4 border border-slate-200 bg-white/90 shadow-2xl"
+            >
+              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-orange-500 px-4 py-3 text-white">
+                <p className="text-sm font-semibold">Processing Scene</p>
+                <p className="text-xs text-blue-100/90">Calibrating Landsat 8 TIRS Band 10 radiance and refreshing MUHI thresholds...</p>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-5 text-sm text-slate-600">
+                <span
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border-4 border-blue-500/70 border-t-transparent animate-spin"
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="font-semibold text-slate-700">Hang tight</p>
+                  <p className="text-xs text-slate-500">We are mapping thermal emissivity and reloading canopy/top-2 hotspots...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {queryData && (
         <InteractiveQuery

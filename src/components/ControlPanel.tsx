@@ -7,7 +7,6 @@ import {
   Target,
   Database,
   Thermometer,
-  MapPin,
   TreePine,
   Building,
   BarChart3,
@@ -28,15 +27,11 @@ interface ControlPanelProps {
     lstVisible: boolean;
     muhiCanopy40: boolean;
     muhiTop2Percent: boolean;
-    groundTruth: boolean;
-    landCover: boolean;
   };
   setLayers: (layers: {
     lstVisible: boolean;
     muhiCanopy40: boolean;
     muhiTop2Percent: boolean;
-    groundTruth: boolean;
-    landCover: boolean;
   }) => void;
   queryMode: boolean;
   setQueryMode: (mode: boolean) => void;
@@ -258,19 +253,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   {layers.muhiTop2Percent ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
                 </button>
 
-                <button
-                  onClick={() => toggleLayer('groundTruth')}
-                  className={`w-full flex items-center gap-3 p-3 border-2 transition-all ${
-                    layers.groundTruth ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  <div className="text-left flex-1">
-                    <div className="text-sm font-medium">Ground Truth Stations</div>
-                    <div className="text-xs">23 validated weather stations</div>
-                  </div>
-                  {layers.groundTruth ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                </button>
               </div>
             )}
           </div>

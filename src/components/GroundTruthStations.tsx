@@ -15,7 +15,19 @@ import {
   EyeOff
 } from 'lucide-react';
 
-import type { WeatherStation } from '../services/dataset';
+interface WeatherStation {
+  stationId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  elevation: number;
+  type: 'PWS' | 'NOAA';
+  accuracy: 'High' | 'Medium' | 'Low';
+  dataQuality: number;
+  lastUpdate: string;
+  temperatures: Record<string, number>;
+  lstTemperatures: Record<string, number>;
+}
 
 interface GroundTruthStationsProps {
   selectedDate: string;

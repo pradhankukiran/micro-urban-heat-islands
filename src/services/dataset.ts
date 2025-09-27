@@ -73,33 +73,6 @@ export interface RasterData {
   sample: (lat: number, lng: number) => Promise<number | null>;
 }
 
-export interface WeatherStation {
-  stationId: string;
-  name: string;
-  lat: number;
-  lng: number;
-  elevation: number;
-  type: 'PWS' | 'NOAA';
-  accuracy: 'High' | 'Medium' | 'Low';
-  dataQuality: number;
-  lastUpdate: string;
-  temperatures: Record<string, number>;
-  lstTemperatures: Record<string, number>;
-}
-
-export interface LandCoverCategory {
-  id: string;
-  name: string;
-  code: number;
-  area: number;
-  color: string;
-  muhiContribution: {
-    canopy40: number;
-    top2percent: number;
-  };
-  description: string;
-}
-
 export interface SceneDataset {
   info: SceneInfo;
   manifest: SceneManifest;
@@ -111,9 +84,6 @@ export interface SceneDataset {
     threshold: string;
     count: string;
   };
-  groundTruthStations?: WeatherStation[];
-  landCover?: FeatureCollection;
-  landCoverCategories?: LandCoverCategory[];
 }
 
 const sceneIndexCache: { value: SceneInfo[] | null } = { value: null };
@@ -251,13 +221,11 @@ export const loadSceneDataset = async (info: SceneInfo): Promise<SceneDataset> =
     return resolveManifestPath(manifest, candidate);
   })();
 
-  const [canopy, top2, raster, detailedMuhi, groundTruthStations, landCoverData] = await Promise.all([
+  const [canopy, top2, raster, detailedMuhi] = await Promise.all([
     fetchGeoJSON(canopyUrl),
     fetchGeoJSON(top2Url),
     loadRaster(info, manifest),
-    fetchGeoJSONOptional(detailedMuhiPath),
-    fetchGroundTruthStations(),
-    fetchLandCoverData()
+    fetchGeoJSONOptional(detailedMuhiPath)
   ]);
 
   return {
@@ -270,88 +238,8 @@ export const loadSceneDataset = async (info: SceneInfo): Promise<SceneDataset> =
     geojsonPropertyKeys: {
       threshold: thresholdProperty,
       count: countProperty
-    },
-    groundTruthStations,
-    landCover: landCoverData.features,
-    landCoverCategories: landCoverData.categories
+    }
   };
-};
-
-const groundTruthCache: { value: WeatherStation[] | null } = { value: null };
-const landCoverCache: { value: { features: FeatureCollection; categories: LandCoverCategory[] } | null } = { value: null };
-
-const parseCSVToStations = (csvText: string): WeatherStation[] => {
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',');
-
-  return lines.slice(1).map(line => {
-    const values = line.split(',');
-    const station: any = {};
-
-    headers.forEach((header, index) => {
-      station[header] = values[index];
-    });
-
-    return {
-      stationId: station.station_id,
-      name: station.name,
-      lat: parseFloat(station.lat),
-      lng: parseFloat(station.lng),
-      elevation: parseInt(station.elevation),
-      type: station.type as 'PWS' | 'NOAA',
-      accuracy: station.accuracy as 'High' | 'Medium' | 'Low',
-      dataQuality: parseInt(station.data_quality),
-      lastUpdate: station.last_update,
-      temperatures: {
-        '2023-07-12': parseFloat(station.temp_2023_07_12),
-        '2023-08-29': parseFloat(station.temp_2023_08_29),
-        '2023-09-14': parseFloat(station.temp_2023_09_14)
-      },
-      lstTemperatures: {
-        '2023-07-12': parseFloat(station.lst_temp_2023_07_12),
-        '2023-08-29': parseFloat(station.lst_temp_2023_08_29),
-        '2023-09-14': parseFloat(station.lst_temp_2023_09_14)
-      }
-    };
-  });
-};
-
-export const fetchGroundTruthStations = async (): Promise<WeatherStation[]> => {
-  if (groundTruthCache.value) return groundTruthCache.value;
-
-  const response = await fetch(`${basePath}/ground_truth_stations.csv`);
-  if (!response.ok) throw new Error('Failed to load ground truth stations');
-
-  const csvText = await response.text();
-  const stations = parseCSVToStations(csvText);
-  groundTruthCache.value = stations;
-  return stations;
-};
-
-export const fetchLandCoverData = async (): Promise<{ features: FeatureCollection; categories: LandCoverCategory[] }> => {
-  if (landCoverCache.value) return landCoverCache.value;
-
-  const response = await fetch(`${basePath}/land_cover_classification.geojson`);
-  if (!response.ok) throw new Error('Failed to load land cover classification');
-
-  const featureCollection = (await response.json()) as FeatureCollection;
-
-  const categories: LandCoverCategory[] = featureCollection.features.map(feature => ({
-    id: feature.properties?.id || '',
-    name: feature.properties?.name || '',
-    code: feature.properties?.code || 0,
-    area: feature.properties?.area_ha || 0,
-    color: feature.properties?.color || '#cccccc',
-    muhiContribution: {
-      canopy40: feature.properties?.muhi_contribution_canopy40 || 0,
-      top2percent: feature.properties?.muhi_contribution_top2 || 0
-    },
-    description: feature.properties?.description || ''
-  }));
-
-  const result = { features: featureCollection, categories };
-  landCoverCache.value = result;
-  return result;
 };
 
 export const clearSceneCaches = () => {
@@ -359,6 +247,4 @@ export const clearSceneCaches = () => {
   geojsonCache.clear();
   rasterCache.clear();
   sceneIndexCache.value = null;
-  groundTruthCache.value = null;
-  landCoverCache.value = null;
 };

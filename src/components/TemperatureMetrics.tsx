@@ -6,7 +6,8 @@ import {
   TreePine,
   CheckCircle,
   Info,
-  BarChart3
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import type { SceneDataset } from '../services/dataset';
 
@@ -15,38 +16,25 @@ interface TemperatureMetricsProps {
   isLoading: boolean;
 }
 
+const sections = [
+  { id: 'muhi', label: 'MUHI Stats', icon: Target },
+  { id: 'coverage', label: 'Coverage', icon: Building },
+  { id: 'stats', label: 'LST Stats', icon: BarChart3 }
+] as const;
+
 const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoading }) => {
   const [activeSection, setActiveSection] = useState<'muhi' | 'coverage' | 'stats'>('muhi');
 
-  if (isLoading) {
-    return (
-      <div className="bg-white shadow-xl border border-slate-200 p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-slate-200" />
-          <div className="h-8 bg-slate-200" />
-          <div className="h-4 bg-slate-200 w-3/4" />
-        </div>
-      </div>
-    );
-  }
+  const thresholds = dataset?.manifest.thresholds ?? null;
+  const statistics = dataset?.manifest.raster.statistics ?? null;
+  const totalPixels = dataset?.manifest.summary?.pixelCount ?? null;
+  const sceneLabel = dataset?.info.label ?? 'Awaiting scene selection';
 
-  if (!dataset) {
-    return (
-      <div className="bg-white shadow-xl border border-slate-200 p-6">
-        <div className="text-sm text-slate-500">Select a scene to view metrics.</div>
-      </div>
-    );
-  }
-
-  const thresholds = dataset.manifest.thresholds;
-  const statistics = dataset.manifest.raster.statistics;
-  const totalPixels = dataset.manifest.summary?.pixelCount ?? null;
-
-  const sections = [
-    { id: 'muhi', label: 'MUHI Stats', icon: Target },
-    { id: 'coverage', label: 'Coverage', icon: Building },
-    { id: 'stats', label: 'LST Stats', icon: BarChart3 }
-  ] as const;
+  const statusMessage = isLoading
+    ? 'Loading scene metrics…'
+    : !dataset
+      ? 'Select a scene to populate metrics.'
+      : null;
 
   return (
     <div className="bg-white shadow-xl border border-slate-200 overflow-hidden h-[620px] flex flex-col">
@@ -56,9 +44,22 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
           <h3 className="text-lg font-semibold text-white">Research Metrics</h3>
         </div>
         <div className="text-xs text-red-100 mt-1">
-          Landsat 8 MUHI Analysis | {dataset.info.label}
+          {dataset ? `Landsat 8 MUHI Analysis | ${sceneLabel}` : 'Metrics will appear once a scene is loaded.'}
         </div>
       </div>
+
+      {statusMessage && (
+        <div className={`border-b border-slate-200 flex-shrink-0 px-4 py-2 text-xs ${
+          isLoading
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-slate-50 text-slate-600'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Activity className="w-3 h-3" />
+            {statusMessage}
+          </div>
+        </div>
+      )}
 
       <div className="border-b border-slate-200 flex-shrink-0">
         <div className="flex">
@@ -89,12 +90,12 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
               </div>
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div>
-                  <div className="text-xl font-bold text-red-700">{thresholds.canopy40.pixelCount?.toLocaleString() ?? '—'}</div>
-                  <div className="text-xs text-slate-600">Pixels ≥40°C</div>
+                  <div className="text-xl font-bold text-red-700">{thresholds?.canopy40.pixelCount?.toLocaleString() ?? '—'}</div>
+                  <div className="text-xs text-slate-600">Pixels &gt;= 40°C</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-orange-600">{thresholds.top2percent.pixelCount?.toLocaleString() ?? '—'}</div>
-                  <div className="text-xs text-slate-600">Pixels ≥98th percentile</div>
+                  <div className="text-xl font-bold text-orange-600">{thresholds?.top2percent.pixelCount?.toLocaleString() ?? '—'}</div>
+                  <div className="text-xs text-slate-600">Pixels &gt;= 98th percentile</div>
                 </div>
               </div>
             </div>
@@ -104,7 +105,7 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
                 <CheckCircle className="w-4 h-4 text-green-600" />
                 <span className="text-sm font-semibold text-slate-700">Validation Snapshot</span>
               </div>
-              <p>Ground station comparison ready – integrate actual station records to replace mock data in the dashboard.</p>
+              <p>Integrate actual station observations to convert this panel from guidance to live validation analytics.</p>
             </div>
           </div>
         )}
@@ -118,12 +119,12 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
 
             <div className="bg-gradient-to-br from-blue-50 to-green-50 p-4 border border-blue-200 space-y-2">
               <div className="flex justify-between">
-                <span>Canopy ≥40°C</span>
-                <span>{thresholds.canopy40.areaHa?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—'} ha</span>
+                <span>Canopy &gt;= 40°C</span>
+                <span>{thresholds?.canopy40.areaHa?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—'} ha</span>
               </div>
               <div className="flex justify-between">
                 <span>Top 2% Hotspots</span>
-                <span>{thresholds.top2percent.areaHa?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—'} ha</span>
+                <span>{thresholds?.top2percent.areaHa?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? '—'} ha</span>
               </div>
               <div className="flex justify-between">
                 <span>Total Raster Pixels</span>
@@ -136,23 +137,29 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
                 <TreePine className="w-4 h-4 text-slate-600" />
                 <span className="text-sm font-semibold text-slate-700">Next Layer</span>
               </div>
-              <p className="mt-2">Integrate land-cover polygons or raster classification to enrich this panel with material-specific MUHI contributions.</p>
+              <p className="mt-2">Integrate land-cover polygons or raster classifications to reveal material-specific MUHI contributions.</p>
             </div>
           </div>
         )}
 
-        {activeSection === 'stats' && statistics && (
+        {activeSection === 'stats' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-indigo-600" />
               <span className="text-sm font-semibold text-slate-700">LST Statistics</span>
             </div>
 
+            {!statistics && (
+              <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                {isLoading ? 'Loading statistics…' : 'Summary statistics unavailable for this scene.'}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
-              <MetricCard label="Minimum" value={statistics.min} />
-              <MetricCard label="Maximum" value={statistics.max} />
-              <MetricCard label="Mean" value={statistics.mean} />
-              <MetricCard label="98th percentile" value={statistics.percentile98} />
+              <MetricCard label="Minimum" value={statistics?.min} />
+              <MetricCard label="Maximum" value={statistics?.max} />
+              <MetricCard label="Mean" value={statistics?.mean} />
+              <MetricCard label="98th percentile" value={statistics?.percentile98} />
             </div>
 
             <div className="bg-slate-50 border border-slate-200 p-4">
@@ -160,7 +167,7 @@ const TemperatureMetrics: React.FC<TemperatureMetricsProps> = ({ dataset, isLoad
                 <Info className="w-4 h-4 text-slate-600" />
                 <span className="text-sm font-semibold text-slate-700">Methodology</span>
               </div>
-              <p className="mt-2">Statistics computed from the manifest generated via the Google Earth Engine workflow. Update manifests after any new preprocessing to keep this panel accurate.</p>
+              <p className="mt-2">Statistics derive from the manifest generated via the Google Earth Engine workflow. Refresh manifests whenever preprocessing steps change to keep this panel accurate.</p>
             </div>
           </div>
         )}
