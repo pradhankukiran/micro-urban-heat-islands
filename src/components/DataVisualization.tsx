@@ -5,7 +5,9 @@ import {
   TrendingUp,
   Activity,
   MapPin,
-  Target
+  Target,
+  Database,
+  Info
 } from 'lucide-react';
 import type { SceneDataset } from '../services/dataset';
 
@@ -20,6 +22,12 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ dataset, isLoadin
   const histogram = dataset?.manifest.histogram;
   const statistics = dataset?.manifest.raster.statistics;
   const thresholds = dataset?.manifest.thresholds;
+
+  const sections = [
+    { id: 'histogram', label: 'Histogram', icon: BarChart3 },
+    { id: 'thresholds', label: 'MUHI Thresholds', icon: Target },
+    { id: 'summary', label: 'Summary', icon: Info }
+  ] as const;
 
   const maxPixels = useMemo(() => {
     if (!histogram) return 0;
@@ -46,31 +54,33 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ dataset, isLoadin
   }
 
   return (
-    <div className="bg-white shadow-xl border border-slate-200 h-full flex flex-col">
-      <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-slate-700">LST Analytics</div>
-          <div className="text-xs text-slate-500">{dataset.info.label}</div>
+    <div className="bg-white shadow-xl border border-slate-200 overflow-hidden h-[620px] flex flex-col">
+      <div className="bg-gradient-to-r from-red-500 to-orange-500 p-4 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Database className="w-5 h-5 text-white" />
+          <h3 className="text-lg font-semibold text-white">LST Analytics</h3>
         </div>
-        <div className="flex gap-2 text-xs">
-          <button
-            onClick={() => setActiveTab('histogram')}
-            className={`px-3 py-1 border ${activeTab === 'histogram' ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-slate-200 text-slate-600'}`}
-          >
-            Histogram
-          </button>
-          <button
-            onClick={() => setActiveTab('thresholds')}
-            className={`px-3 py-1 border ${activeTab === 'thresholds' ? 'border-orange-500 text-orange-600 bg-orange-50' : 'border-slate-200 text-slate-600'}`}
-          >
-            MUHI Thresholds
-          </button>
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`px-3 py-1 border ${activeTab === 'summary' ? 'border-green-500 text-green-600 bg-green-50' : 'border-slate-200 text-slate-600'}`}
-          >
-            Summary
-          </button>
+        <div className="text-xs text-red-100 mt-1">
+          Landsat 8 MUHI Analysis | {dataset.info.label}
+        </div>
+      </div>
+
+      <div className="border-b border-slate-200 flex-shrink-0">
+        <div className="flex">
+          {sections.map(section => (
+            <button
+              key={section.id}
+              onClick={() => setActiveTab(section.id)}
+              className={`flex items-center gap-1 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === section.id
+                  ? 'border-b-2 border-red-500 text-red-600 bg-red-50'
+                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <section.icon className="w-4 h-4" />
+              {section.label}
+            </button>
+          ))}
         </div>
       </div>
 
