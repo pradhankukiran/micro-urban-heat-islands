@@ -11,12 +11,20 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@turf/boolean-point-in-polygon": "^7.2.0",
+    "@turf/helpers": "^7.2.0",
+    "geoblaze": "^2.8.0",
+    "georaster": "^1.6.0",
+    "georaster-layer-for-leaflet": "^4.1.2",
+    "geotiff": "^2.1.4-beta.0",
     "lucide-react": "^0.344.0",
+    "proj4": "^2.19.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/geojson": "^7946.0.16",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

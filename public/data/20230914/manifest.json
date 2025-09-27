@@ -1,0 +1,213 @@
+{
+  "date": "2023-09-14",
+  "raster": {
+    "path": "./lst_20230914.tif",
+    "band": "LST_C",
+    "nodata": null,
+    "scaleMeters": 30,
+    "crs": "EPSG:4326",
+    "statistics": {
+      "min": 13.9,
+      "max": 59.28,
+      "mean": 35.18,
+      "percentile98": 47.81
+    },
+    "legend": {
+      "palette": [
+        "#0000ff",
+        "#00ffff",
+        "#7fff00",
+        "#ffff00",
+        "#ff8c00",
+        "#ff0000"
+      ],
+      "breaks": [
+        20,
+        25,
+        30,
+        35,
+        40,
+        45
+      ]
+    }
+  },
+  "thresholds": {
+    "canopy40": {
+      "path": "./muhi-40c.geojson",
+      "pixelCount": 2967476,
+      "areaHa": 267072.84
+    },
+    "top2percent": {
+      "path": "./muhi-top2.geojson",
+      "pixelCount": 215888,
+      "areaHa": 19429.92,
+      "cutoffC": 47.81
+    }
+  },
+  "notes": {
+    "geojsonThresholdProperty": "threshold",
+    "geojsonCountProperty": "count"
+  },
+  "histogram": {
+    "binSize": 1,
+    "bins": [
+      {
+        "binStart": 16,
+        "binEnd": 17,
+        "pixels": 1480
+      },
+      {
+        "binStart": 17,
+        "binEnd": 18,
+        "pixels": 27830
+      },
+      {
+        "binStart": 18,
+        "binEnd": 19,
+        "pixels": 137252
+      },
+      {
+        "binStart": 19,
+        "binEnd": 20,
+        "pixels": 151134
+      },
+      {
+        "binStart": 20,
+        "binEnd": 21,
+        "pixels": 90971
+      },
+      {
+        "binStart": 21,
+        "binEnd": 22,
+        "pixels": 69037
+      },
+      {
+        "binStart": 22,
+        "binEnd": 23,
+        "pixels": 118599
+      },
+      {
+        "binStart": 23,
+        "binEnd": 24,
+        "pixels": 171213
+      },
+      {
+        "binStart": 24,
+        "binEnd": 25,
+        "pixels": 228717
+      },
+      {
+        "binStart": 25,
+        "binEnd": 26,
+        "pixels": 273103
+      },
+      {
+        "binStart": 26,
+        "binEnd": 27,
+        "pixels": 315630
+      },
+      {
+        "binStart": 27,
+        "binEnd": 28,
+        "pixels": 354133
+      },
+      {
+        "binStart": 28,
+        "binEnd": 29,
+        "pixels": 387252
+      },
+      {
+        "binStart": 29,
+        "binEnd": 30,
+        "pixels": 414407
+      },
+      {
+        "binStart": 30,
+        "binEnd": 31,
+        "pixels": 448450
+      },
+      {
+        "binStart": 31,
+        "binEnd": 32,
+        "pixels": 493560
+      },
+      {
+        "binStart": 32,
+        "binEnd": 33,
+        "pixels": 527466
+      },
+      {
+        "binStart": 33,
+        "binEnd": 34,
+        "pixels": 553370
+      },
+      {
+        "binStart": 34,
+        "binEnd": 35,
+        "pixels": 592893
+      },
+      {
+        "binStart": 35,
+        "binEnd": 36,
+        "pixels": 631929
+      },
+      {
+        "binStart": 36,
+        "binEnd": 37,
+        "pixels": 638637
+      },
+      {
+        "binStart": 37,
+        "binEnd": 38,
+        "pixels": 632839
+      },
+      {
+        "binStart": 38,
+        "binEnd": 39,
+        "pixels": 636935
+      },
+      {
+        "binStart": 39,
+        "binEnd": 40,
+        "pixels": 577411
+      },
+      {
+        "binStart": 40,
+        "binEnd": 41,
+        "pixels": 470753
+      },
+      {
+        "binStart": 41,
+        "binEnd": 42,
+        "pixels": 391969
+      },
+      {
+        "binStart": 42,
+        "binEnd": 43,
+        "pixels": 342183
+      },
+      {
+        "binStart": 43,
+        "binEnd": 44,
+        "pixels": 347565
+      },
+      {
+        "binStart": 44,
+        "binEnd": 45,
+        "pixels": 375886
+      },
+      {
+        "binStart": 45,
+        "binEnd": 46,
+        "pixels": 343956
+      }
+    ]
+  },
+  "summary": {
+    "pixelCount": 11444313,
+    "validPixels": 11444313,
+    "mean": 35.18,
+    "min": 13.9,
+    "max": 59.28
+  }
+}

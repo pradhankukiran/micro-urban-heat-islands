@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from './components/Header';
 import MapContainer from './components/MapContainer';
 import ControlPanel from './components/ControlPanel';
@@ -9,8 +9,15 @@ import InteractiveQuery from './components/InteractiveQuery';
 import GroundTruthStations from './components/GroundTruthStations';
 import LandCoverOverlay from './components/LandCoverOverlay';
 import StatisticalDashboard from './components/StatisticalDashboard';
+import {
+  fetchSceneIndex,
+  loadSceneDataset,
+  type SceneDataset,
+  type SceneInfo
+} from './services/dataset';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { point as turfPoint } from '@turf/helpers';
 
-// Enhanced interfaces for sophisticated state management
 interface LayerState {
   lstVisible: boolean;
   muhiCanopy40: boolean;
@@ -50,11 +57,11 @@ interface LayoutState {
 }
 
 function App() {
-  // Core application state
-  const [selectedDate, setSelectedDate] = useState('2023-08-29'); // Default to hottest research date
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Enhanced layer management state
+  const [sceneOptions, setSceneOptions] = useState<SceneInfo[]>([]);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [dataset, setDataset] = useState<SceneDataset | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerState>({
     lstVisible: true,
     muhiCanopy40: true,
@@ -62,8 +69,6 @@ function App() {
     groundTruth: false,
     landCover: false
   });
-
-  // Layout and UI state
   const [layout, setLayout] = useState<LayoutState>({
     showStatistics: true,
     showGroundTruth: false,
@@ -71,112 +76,133 @@ function App() {
     showDashboard: false,
     queryMode: false
   });
-
-  // Interactive query state
   const [queryData, setQueryData] = useState<QueryData | null>(null);
   const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  // Research data state
-  const [temperatureData, setTemperatureData] = useState([]);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
-
-  // Research-based available dates
-  const availableDates = ['2023-07-12', '2023-08-29', '2023-09-14'];
-
-  // Enhanced data loading with research-specific simulation
+  // Load scene index on mount
   useEffect(() => {
-    const loadResearchData = async () => {
-      setIsLoading(true);
-      // Simulate realistic research data loading
-      await new Promise(resolve => setTimeout(resolve, 800));
+    let active = true;
+    (async () => {
+      try {
+        const scenes = await fetchSceneIndex();
+        if (!active) return;
+        setSceneOptions(scenes);
+        if (!selectedDate && scenes.length) {
+          const preferred = scenes.find(scene => scene.date === '2023-08-29') ?? scenes[0];
+          setSelectedDate(preferred.date);
+        }
+      } catch (error) {
+        if (!active) return;
+        setDataError((error as Error).message);
+      }
+    })();
 
-      // Generate research-realistic temperature distribution data
-      const generateTemperatureDistribution = (date: string) => {
-        const baseTemp = date === '2023-08-29' ? 37.1 : date === '2023-07-12' ? 35.2 : 31.8;
-        return Array.from({ length: 1000 }, () => {
-          // Generate realistic LST distribution
-          const temp = baseTemp + (Math.random() - 0.5) * 20;
-          return Math.max(16, Math.min(44, temp));
-        });
-      };
-
-      const researchData = generateTemperatureDistribution(selectedDate);
-      setTemperatureData(researchData as any);
-      setLastRefresh(new Date());
-      setIsLoading(false);
+    return () => {
+      active = false;
     };
-
-    loadResearchData();
   }, [selectedDate]);
 
-  // Enhanced handlers for complex interactions
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    if (!layout.queryMode) return;
+  // Load dataset when selected date changes
+  useEffect(() => {
+    if (!selectedDate) return;
+    const scene = sceneOptions.find(item => item.date === selectedDate);
+    if (!scene) return;
 
-    // Simulate temperature query based on research data and location
-    const simulateTemperatureQuery = () => {
-      const baseTemp = selectedDate === '2023-08-29' ? 37.1 : selectedDate === '2023-07-12' ? 35.2 : 31.8;
-      const locationVariation = (Math.random() - 0.5) * 8;
-      const temperature = Math.round((baseTemp + locationVariation) * 10) / 10;
+    let cancelled = false;
+    setIsLoading(true);
+    setDataError(null);
+    setDataset(null);
 
-      // Determine land cover based on rough LA geography
-      const landCoverTypes = ['Buildings', 'Concrete', 'Dense Vegetation', 'Sparse Vegetation',
-                             'Unvegetated Asphalt', 'Vegetated Asphalt', 'Water Body'];
-      const landCover = landCoverTypes[Math.floor(Math.random() * landCoverTypes.length)];
+    loadSceneDataset(scene)
+      .then(data => {
+        if (cancelled) return;
+        setDataset(data);
+        setLastRefresh(new Date());
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setDataError((error as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-      // Determine MUHI status based on temperature
-      const muhiStatus = [];
-      if (temperature >= 40) {
-        muhiStatus.push('MUHI Detected: ≥40°C (Canopy Threshold)');
-        muhiStatus.push('MUHI Detected: ≥39°C (Top 2% Threshold)');
-      } else if (temperature >= 39) {
-        muhiStatus.push('MUHI Detected: ≥39°C (Top 2% Threshold)');
-      } else {
-        muhiStatus.push('No MUHI Detected');
-      }
-
-      return { lat, lng, temperature, landCover, muhiStatus };
+    return () => {
+      cancelled = true;
     };
+  }, [selectedDate, sceneOptions]);
 
-    setQueryData(simulateTemperatureQuery());
-  }, [layout.queryMode, selectedDate]);
+  const handleMapClick = useCallback(async (lat: number, lng: number) => {
+    if (!layout.queryMode || !dataset) return;
+
+    const temperature = await dataset.raster.sample(lat, lng);
+    if (temperature === null) {
+      setQueryData({
+        lat,
+        lng,
+        temperature: NaN,
+        landCover: 'Outside coverage',
+        muhiStatus: ['No data available']
+      });
+      return;
+    }
+
+    const point = turfPoint([lng, lat]);
+    const canopyHit = dataset.canopy.features?.some(feature => booleanPointInPolygon(point, feature as any)) ?? false;
+    const top2Hit = dataset.top2.features?.some(feature => booleanPointInPolygon(point, feature as any)) ?? false;
+
+    const roundedTemperature = Math.round(temperature * 10) / 10;
+    const status: string[] = [];
+    if (canopyHit) status.push('≥ 40°C Canopy Threshold');
+    if (top2Hit) status.push('Top 2% Threshold');
+    if (!status.length) status.push('Below MUHI thresholds');
+
+    setQueryData({
+      lat,
+      lng,
+      temperature: roundedTemperature,
+      landCover: canopyHit || top2Hit ? 'Hotspot' : 'Background',
+      muhiStatus: status
+    });
+  }, [layout.queryMode, dataset]);
 
   const handleStationSelect = useCallback((station: WeatherStation) => {
     setSelectedStation(station);
   }, []);
 
   const handleDataExport = useCallback(() => {
-    // Simulate comprehensive data export
-    const exportData = {
-      date: selectedDate,
-      muhiPolygons: 'muhi_polygons.geojson',
-      lstRaster: 'lst_raster.tiff',
-      statistics: 'muhi_statistics.csv',
-      groundTruth: 'ground_truth_validation.csv',
-      landCover: 'land_cover_classification.geojson'
-    };
+    if (!dataset) {
+      window.alert('Load a scene before exporting data.');
+      return;
+    }
 
-    console.log('Exporting MUHI analysis data:', exportData);
-    // In a real implementation, this would trigger actual file downloads
-    alert(`Exporting complete MUHI dataset for ${selectedDate}\n\nIncluded files:\n• MUHI polygons (GeoJSON)\n• LST raster data (GeoTIFF)\n• Statistical summary (CSV)\n• Ground truth data (CSV)\n• Land cover classification (GeoJSON)`);
-  }, [selectedDate]);
+    const base = `/data/${dataset.info.date}`;
+    const files = [
+      { label: 'LST raster (GeoTIFF)', path: `${base}/${dataset.manifest.raster.path.replace(/^\.\//, '')}` },
+      { label: 'MUHI ≥40°C polygons', path: `${base}/${dataset.manifest.thresholds.canopy40.path.replace(/^\.\//, '')}` },
+      { label: 'MUHI Top 2% polygons', path: `${base}/${dataset.manifest.thresholds.top2percent.path.replace(/^\.\//, '')}` },
+      { label: 'Scene manifest', path: `${base}/manifest.json` }
+    ];
 
-  const handleCategoryToggle = useCallback((categoryId: string) => {
-    console.log(`Toggling land cover category: ${categoryId}`);
-    // In a real implementation, this would update map layers
-  }, []);
+    const message = files
+      .map(file => `${file.label}: ${file.path}`)
+      .join('\n');
 
-  const handleOpacityChange = useCallback((categoryId: string, opacity: number) => {
-    console.log(`Updating opacity for ${categoryId}: ${opacity}`);
-    // In a real implementation, this would update layer opacity
-  }, []);
+    window.alert(`Download the dataset files:\n\n${message}\n\nUse right-click → Save link as… if links do not open automatically.`);
+  }, [dataset]);
 
-  // Layout toggle handlers
   const toggleStatistics = () => setLayout(prev => ({ ...prev, showStatistics: !prev.showStatistics }));
   const toggleGroundTruth = () => setLayout(prev => ({ ...prev, showGroundTruth: !prev.showGroundTruth }));
   const toggleLandCover = () => setLayout(prev => ({ ...prev, showLandCover: !prev.showLandCover }));
   const toggleDashboard = () => setLayout(prev => ({ ...prev, showDashboard: !prev.showDashboard }));
   const toggleQueryMode = () => setLayout(prev => ({ ...prev, queryMode: !prev.queryMode }));
+
+  const histogram = dataset?.manifest.histogram;
+  const currentSceneLabel = useMemo(() => {
+    const scene = sceneOptions.find(item => item.date === selectedDate);
+    return scene?.label ?? selectedDate;
+  }, [sceneOptions, selectedDate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
@@ -184,30 +210,37 @@ function App() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Enhanced Map Section */}
           <div className="lg:col-span-3">
             <div className="bg-white shadow-xl overflow-hidden border border-slate-200">
               <div className="bg-gradient-to-r from-blue-600 to-orange-600 p-4">
                 <h2 className="text-xl font-bold text-white">
-                  Micro-Urban Heat Islands Analysis - Los Angeles
+                  Micro-Urban Heat Islands Analysis – {currentSceneLabel}
                 </h2>
                 <p className="text-blue-100 text-sm mt-1">
-                  Landsat 8 Collection 2 Level 2 | NDVI → Emissivity → LST | {selectedDate}
+                  Landsat 8 Collection 2 Level 2 | NDVI → Emissivity → LST
                 </p>
+                {lastRefresh && (
+                  <p className="text-[11px] text-blue-200 mt-1">Loaded {lastRefresh.toLocaleTimeString()}</p>
+                )}
+                {dataError && (
+                  <p className="text-[11px] text-red-200 mt-1">{dataError}</p>
+                )}
               </div>
               <MapContainer
                 selectedDate={selectedDate}
                 layers={layers}
                 queryMode={layout.queryMode}
                 onMapClick={handleMapClick}
+                dataset={dataset}
               />
             </div>
           </div>
 
-          {/* Enhanced Control Panel */}
           <div className="lg:col-span-1 space-y-6">
             <ControlPanel
               selectedDate={selectedDate}
+              scenes={sceneOptions}
+              manifest={dataset?.manifest}
               setSelectedDate={setSelectedDate}
               layers={layers}
               setLayers={setLayers}
@@ -215,10 +248,10 @@ function App() {
               setQueryMode={toggleQueryMode}
               showStatistics={layout.showStatistics}
               setShowStatistics={toggleStatistics}
+              isDatasetLoading={isLoading}
               onExportData={handleDataExport}
             />
 
-            {/* Conditional sidebar components */}
             {layout.showGroundTruth && (
               <GroundTruthStations
                 selectedDate={selectedDate}
@@ -233,46 +266,39 @@ function App() {
                 selectedDate={selectedDate}
                 isVisible={layout.showLandCover}
                 onToggleVisibility={toggleLandCover}
-                onCategoryToggle={handleCategoryToggle}
-                onOpacityChange={handleOpacityChange}
               />
             )}
           </div>
         </div>
 
-        {/* Enhanced Data Visualization Section */}
         <div className="mt-8 space-y-6">
-          {/* Primary Analytics Row */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
               <DataVisualization
-                selectedDate={selectedDate}
+                dataset={dataset}
                 isLoading={isLoading}
               />
             </div>
 
             <div className="xl:col-span-1">
               <TemperatureMetrics
-                selectedDate={selectedDate}
+                dataset={dataset}
                 isLoading={isLoading}
               />
             </div>
           </div>
 
-          {/* Secondary Analytics Row */}
           {layout.showDashboard && (
             <div className="grid grid-cols-1 gap-6">
               <StatisticalDashboard
-                selectedDate={selectedDate}
+                dataset={dataset}
                 isVisible={layout.showDashboard}
                 onToggleVisibility={toggleDashboard}
                 onExportData={handleDataExport}
-                autoRefresh={true}
               />
             </div>
           )}
 
-          {/* Quick access panel toggles */}
           <div className="flex flex-wrap gap-3 justify-center">
             <button
               onClick={toggleGroundTruth}
@@ -306,9 +332,10 @@ function App() {
             </button>
           </div>
         </div>
+
+        
       </main>
 
-      {/* Interactive Query Modal */}
       {queryData && (
         <InteractiveQuery
           queryData={queryData}

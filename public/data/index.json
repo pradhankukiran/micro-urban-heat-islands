@@ -1,0 +1,19 @@
+{
+  "scenes": [
+    {
+      "date": "2023-07-12",
+      "label": "July 12, 2023",
+      "manifest": "./20230712/manifest.json"
+    },
+    {
+      "date": "2023-08-29",
+      "label": "August 29, 2023",
+      "manifest": "./20230829/manifest.json"
+    },
+    {
+      "date": "2023-09-14",
+      "label": "September 14, 2023",
+      "manifest": "./20230914/manifest.json"
+    }
+  ]
+}
