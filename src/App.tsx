@@ -26,12 +26,21 @@ interface LayerState {
   landCover: boolean;
 }
 
+interface QueryFeatureDetail {
+  id?: string | number;
+  thresholdLabel: string;
+  pixelCount: number | null;
+  areaHa: number | null;
+}
+
 interface QueryData {
   lat: number;
   lng: number;
   temperature: number;
   landCover: string;
   muhiStatus: string[];
+  canopyHits: QueryFeatureDetail[];
+  top2Hits: QueryFeatureDetail[];
 }
 
 interface WeatherStation {
@@ -143,29 +152,85 @@ function App() {
         lng,
         temperature: NaN,
         landCover: 'Outside coverage',
-        muhiStatus: ['No data available']
+        muhiStatus: ['No data available'],
+        canopyHits: [],
+        top2Hits: []
       });
       return;
     }
 
     const point = turfPoint([lng, lat]);
-    const canopyHit = dataset.canopy.features?.some(feature => booleanPointInPolygon(point, feature as any)) ?? false;
-    const top2Hit = dataset.top2.features?.some(feature => booleanPointInPolygon(point, feature as any)) ?? false;
+    const { threshold: thresholdKey, count: countKey } = dataset.geojsonPropertyKeys;
+    const scaleMeters = dataset.manifest.raster.scaleMeters ?? 30;
+    const pixelAreaHa = scaleMeters > 0 ? (scaleMeters * scaleMeters) / 10000 : 0;
+
+    const mapFeatureToDetail = (feature: any): QueryFeatureDetail | null => {
+      if (!feature) return null;
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const rawCountValue = props[countKey];
+      const parsedCount = typeof rawCountValue === 'number'
+        ? rawCountValue
+        : typeof rawCountValue === 'string'
+          ? Number(rawCountValue)
+          : NaN;
+      const thresholdValue = props[thresholdKey];
+      const pixelCount = Number.isFinite(parsedCount) ? parsedCount : null;
+      const areaHa = pixelCount !== null && pixelAreaHa > 0 ? pixelCount * pixelAreaHa : null;
+
+      return {
+        id: feature.id ?? undefined,
+        thresholdLabel: typeof thresholdValue === 'string' || typeof thresholdValue === 'number'
+          ? String(thresholdValue)
+          : 'Threshold',
+        pixelCount,
+        areaHa
+      };
+    };
+
+    const canopyMatches = (dataset.canopy.features ?? [])
+      .map(feature => (booleanPointInPolygon(point, feature as any) ? mapFeatureToDetail(feature) : null))
+      .filter((detail): detail is QueryFeatureDetail => Boolean(detail));
+
+    const top2Matches = (dataset.top2.features ?? [])
+      .map(feature => (booleanPointInPolygon(point, feature as any) ? mapFeatureToDetail(feature) : null))
+      .filter((detail): detail is QueryFeatureDetail => Boolean(detail));
+
+    const canopyHit = canopyMatches.length > 0;
+    const top2Hit = top2Matches.length > 0;
 
     const roundedTemperature = Math.round(temperature * 10) / 10;
     const status: string[] = [];
-    if (canopyHit) status.push('≥ 40°C Canopy Threshold');
-    if (top2Hit) status.push('Top 2% Threshold');
+    if (canopyHit) status.push('≥ 40°C canopy threshold');
+    if (top2Hit) status.push('Top 2% threshold');
     if (!status.length) status.push('Below MUHI thresholds');
+
+    // Query land cover classification
+    let landCoverType = 'Unknown';
+    if (dataset.landCover?.features) {
+      for (const feature of dataset.landCover.features) {
+        if (booleanPointInPolygon(point, feature as any)) {
+          landCoverType = feature.properties?.name || 'Unknown';
+          break;
+        }
+      }
+    }
+
+    // Fallback to simple classification if no land cover polygon match
+    if (landCoverType === 'Unknown') {
+      landCoverType = canopyHit || top2Hit ? 'Hotspot' : 'Background';
+    }
 
     setQueryData({
       lat,
       lng,
       temperature: roundedTemperature,
-      landCover: canopyHit || top2Hit ? 'Hotspot' : 'Background',
-      muhiStatus: status
+      landCover: landCoverType,
+      muhiStatus: status,
+      canopyHits: canopyMatches,
+      top2Hits: top2Matches
     });
   }, [layout.queryMode, dataset]);
+
 
   const handleStationSelect = useCallback((station: WeatherStation) => {
     setSelectedStation(station);
@@ -258,6 +323,7 @@ function App() {
                 isVisible={layout.showGroundTruth}
                 onToggleVisibility={toggleGroundTruth}
                 onStationSelect={handleStationSelect}
+                stations={dataset?.groundTruthStations}
               />
             )}
 
@@ -266,6 +332,7 @@ function App() {
                 selectedDate={selectedDate}
                 isVisible={layout.showLandCover}
                 onToggleVisibility={toggleLandCover}
+                categories={dataset?.landCoverCategories}
               />
             )}
           </div>

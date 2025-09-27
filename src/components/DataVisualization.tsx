@@ -11,6 +11,13 @@ import {
 } from 'lucide-react';
 import type { SceneDataset } from '../services/dataset';
 
+interface HotspotSummary {
+  id?: string | number;
+  label: string;
+  pixels: number;
+  areaHa: number | null;
+}
+
 interface DataVisualizationProps {
   dataset: SceneDataset | null;
   isLoading: boolean;
@@ -28,6 +35,72 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ dataset, isLoadin
     { id: 'thresholds', label: 'MUHI Thresholds', icon: Target },
     { id: 'summary', label: 'Summary', icon: Info }
   ] as const;
+
+  const pixelAreaHa = useMemo(() => {
+    if (!dataset) return 0;
+    const resolution = dataset.manifest.raster.scaleMeters ?? 30;
+    return resolution > 0 ? (resolution * resolution) / 10000 : 0;
+  }, [dataset]);
+
+  const canopyHotspots = useMemo<HotspotSummary[]>(() => {
+    if (!dataset) return [];
+    const { threshold, count } = dataset.geojsonPropertyKeys;
+    const features = dataset.canopy.features ?? [];
+    return features
+      .map(feature => {
+        const props = (feature.properties ?? {}) as Record<string, unknown>;
+        const rawCount = props[count];
+        const parsedCount = typeof rawCount === 'number'
+          ? rawCount
+          : typeof rawCount === 'string'
+            ? Number(rawCount)
+            : NaN;
+        if (!Number.isFinite(parsedCount)) return null;
+        const thresholdValue = props[threshold];
+        const areaHaValue = pixelAreaHa > 0 ? parsedCount * pixelAreaHa : null;
+        return {
+          id: feature.id ?? undefined,
+          label: typeof thresholdValue === 'string' || typeof thresholdValue === 'number'
+            ? String(thresholdValue)
+            : '≥ 40°C',
+          pixels: parsedCount,
+          areaHa: areaHaValue
+        } as HotspotSummary;
+      })
+      .filter((value): value is HotspotSummary => Boolean(value))
+      .sort((a, b) => b.pixels - a.pixels)
+      .slice(0, 8);
+  }, [dataset, pixelAreaHa]);
+
+  const top2Hotspots = useMemo<HotspotSummary[]>(() => {
+    if (!dataset) return [];
+    const { threshold, count } = dataset.geojsonPropertyKeys;
+    const features = dataset.top2.features ?? [];
+    return features
+      .map(feature => {
+        const props = (feature.properties ?? {}) as Record<string, unknown>;
+        const rawCount = props[count];
+        const parsedCount = typeof rawCount === 'number'
+          ? rawCount
+          : typeof rawCount === 'string'
+            ? Number(rawCount)
+            : NaN;
+        if (!Number.isFinite(parsedCount)) return null;
+        const thresholdValue = props[threshold];
+        const areaHaValue = pixelAreaHa > 0 ? parsedCount * pixelAreaHa : null;
+        return {
+          id: feature.id ?? undefined,
+          label: typeof thresholdValue === 'string' || typeof thresholdValue === 'number'
+            ? String(thresholdValue)
+            : 'Top 2%',
+          pixels: parsedCount,
+          areaHa: areaHaValue
+        } as HotspotSummary;
+      })
+      .filter((value): value is HotspotSummary => Boolean(value))
+      .sort((a, b) => b.pixels - a.pixels)
+      .slice(0, 8);
+  }, [dataset, pixelAreaHa]);
 
   const maxPixels = useMemo(() => {
     if (!histogram) return 0;
@@ -154,6 +227,23 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ dataset, isLoadin
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <HotspotList
+                title="Canopy hotspots"
+                icon={<MapPin className="w-4 h-4 text-red-600" />}
+                accentClass="text-red-600"
+                emptyLabel="Per-feature attributes unavailable."
+                items={canopyHotspots}
+              />
+              <HotspotList
+                title="Top 2% hotspots"
+                icon={<Target className="w-4 h-4 text-orange-600" />}
+                accentClass="text-orange-600"
+                emptyLabel="Per-feature attributes unavailable."
+                items={top2Hotspots}
+              />
+            </div>
+
             <div className="bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600">
               <p className="font-semibold text-slate-700 mb-1">Interpretation</p>
               <p>Canopy hotspots denote surfaces that reached or exceeded 40°C. Top 2% hotspots highlight the warmest 98th percentile pixels for the selected acquisition.</p>
@@ -173,6 +263,23 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ dataset, isLoadin
               <SummaryCard label="Mean" value={statistics.mean} icon={<TrendingUp className="w-4 h-4 text-indigo-600" />} />
               <SummaryCard label="Maximum" value={statistics.max} icon={<Thermometer className="w-4 h-4 text-red-600" />} />
               <SummaryCard label="98th Percentile" value={statistics.percentile98} icon={<Target className="w-4 h-4 text-orange-600" />} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <HotspotList
+                title="Canopy hotspots"
+                icon={<MapPin className="w-4 h-4 text-red-600" />}
+                accentClass="text-red-600"
+                emptyLabel="Per-feature attributes unavailable."
+                items={canopyHotspots}
+              />
+              <HotspotList
+                title="Top 2% hotspots"
+                icon={<Target className="w-4 h-4 text-orange-600" />}
+                accentClass="text-orange-600"
+                emptyLabel="Per-feature attributes unavailable."
+                items={top2Hotspots}
+              />
             </div>
 
             <div className="bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600">
@@ -208,3 +315,32 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, icon }) => (
 );
 
 export default DataVisualization;
+
+const HotspotList: React.FC<{ title: string; icon: React.ReactNode; items: HotspotSummary[]; accentClass: string; emptyLabel: string }> = ({ title, icon, items, accentClass, emptyLabel }) => (
+  <div className="bg-white border border-slate-200 p-4">
+    <div className="flex items-center gap-2 mb-2">
+      {icon}
+      <span className="text-sm font-semibold text-slate-700">{title}</span>
+    </div>
+    {items.length ? (
+      <ul className="space-y-2 text-xs text-slate-600">
+        {items.map((item, index) => (
+          <li key={item.id ?? index} className="flex items-center justify-between gap-2">
+            <span className="truncate">
+              <span className={`${accentClass} font-semibold mr-1`}>{index + 1}.</span>
+              {item.label}
+            </span>
+            <span className="text-right whitespace-nowrap text-xs text-slate-500">
+              {item.pixels.toLocaleString()}
+              {item.areaHa !== null ? (
+                <span className="text-slate-400"> · {item.areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p className="text-xs text-slate-500">{emptyLabel}</p>
+    )}
+  </div>
+);

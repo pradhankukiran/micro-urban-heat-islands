@@ -89,6 +89,30 @@ const MapContainer: React.FC<MapContainerProps> = ({
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layerGroups = layerGroupsRef.current;
+    const propertyKeys = dataset?.geojsonPropertyKeys ?? { threshold: 'threshold', count: 'count' };
+    const scaleMeters = dataset?.manifest.raster.scaleMeters ?? 30;
+    const pixelAreaHa = scaleMeters > 0 ? (scaleMeters * scaleMeters) / 10000 : null;
+
+    const getFeatureMetrics = (feature: any): { label: string; pixels: number | null; areaHa: number | null } => {
+      if (!feature) {
+        return { label: 'Threshold', pixels: null, areaHa: null };
+      }
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const thresholdValue = props[propertyKeys.threshold];
+      const rawCount = props[propertyKeys.count];
+      const parsedCount = typeof rawCount === 'number'
+        ? rawCount
+        : typeof rawCount === 'string'
+          ? Number(rawCount)
+          : NaN;
+      const pixelCount = Number.isFinite(parsedCount) ? parsedCount : null;
+      const areaHaValue = pixelCount !== null && pixelAreaHa ? pixelCount * pixelAreaHa : null;
+      const label = typeof thresholdValue === 'string' || typeof thresholdValue === 'number'
+        ? String(thresholdValue)
+        : 'Threshold';
+      return { label, pixels: pixelCount, areaHa: areaHaValue };
+    };
+
     const L = (window as any).L;
 
     if (!map || !L) return;
@@ -142,16 +166,29 @@ const MapContainer: React.FC<MapContainerProps> = ({
           color: '#8B0000',
           fillOpacity: 0.35
         },
-        onEachFeature: (_feature: any, layer: any) => {
+        onEachFeature: (feature: any, layer: any) => {
+          const metrics = getFeatureMetrics(feature);
+          const details: string[] = [];
+          if (metrics.pixels !== null) {
+            details.push(`<div class="text-xs text-slate-500 mt-1">Pixels: ${metrics.pixels.toLocaleString()}</div>`);
+          }
+          if (metrics.areaHa !== null) {
+            details.push(`<div class="text-xs text-slate-500${metrics.pixels !== null ? '' : ' mt-1'}">Feature area: ${metrics.areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>`);
+          }
+          if (areaHa) {
+            details.push(`<div class="text-xs text-slate-500${details.length ? '' : ' mt-1'}">Scene total: ${areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>`);
+          }
+
           layer.bindPopup(`
             <div class="text-sm">
               <div class="font-semibold text-slate-800">MUHI Canopy Threshold</div>
-              <div class="text-slate-600">Temperature ≥ 40°C</div>
-              ${areaHa ? `<div class="text-xs text-slate-500 mt-1">Total Area: ${areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>` : ''}
+              <div class="text-slate-600">Threshold: ${metrics.label}</div>
+              ${details.join('')}
               <div class="text-xs text-slate-500">Date: ${selectedDate}</div>
             </div>
           `);
         }
+
       }).addTo(layerGroups.muhiCanopy40);
 
       layerGroups.muhiCanopy40.addTo(map);
@@ -169,29 +206,46 @@ const MapContainer: React.FC<MapContainerProps> = ({
           color: '#FF8C00',
           fillOpacity: 0.3
         },
-        onEachFeature: (_feature: any, layer: any) => {
+        onEachFeature: (feature: any, layer: any) => {
+          const metrics = getFeatureMetrics(feature);
+          const cutoffText = summary.cutoffC !== undefined && summary.cutoffC !== null
+            ? `Temperature ≥ ${summary.cutoffC}°C`
+            : 'Top 2% hottest pixels';
+          const details: string[] = [];
+          if (metrics.pixels !== null) {
+            details.push(`<div class="text-xs text-slate-500 mt-1">Pixels: ${metrics.pixels.toLocaleString()}</div>`);
+          }
+          if (metrics.areaHa !== null) {
+            details.push(`<div class="text-xs text-slate-500${metrics.pixels !== null ? '' : ' mt-1'}">Feature area: ${metrics.areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>`);
+          }
+          if (summary.areaHa) {
+            details.push(`<div class="text-xs text-slate-500${details.length ? '' : ' mt-1'}">Scene total: ${summary.areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>`);
+          }
+
           layer.bindPopup(`
             <div class="text-sm">
               <div class="font-semibold text-slate-800">MUHI Top 2% Threshold</div>
-              <div class="text-slate-600">Temperature ≥ ${summary.cutoffC ?? '98th percentile'}°C</div>
-              ${summary.areaHa ? `<div class="text-xs text-slate-500 mt-1">Total Area: ${summary.areaHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha</div>` : ''}
+              <div class="text-slate-600">${cutoffText}</div>
+              <div class="text-xs text-slate-500 mt-1">Threshold label: ${metrics.label}</div>
+              ${details.join('')}
               <div class="text-xs text-slate-500">Date: ${selectedDate}</div>
             </div>
           `);
         }
+
       }).addTo(layerGroups.muhiTop2Percent);
 
       layerGroups.muhiTop2Percent.addTo(map);
     }
 
-    // Ground truth layer remains placeholder (static markers)
+    // Ground truth layer using real data
     clearLayerGroup('groundTruth');
-    if (layers.groundTruth) {
-      const stations = mockGroundTruthStations();
-      stations.forEach(station => {
+    if (layers.groundTruth && dataset?.groundTruthStations) {
+      dataset.groundTruthStations.forEach(station => {
         const temp = station.temperatures[selectedDate];
-        if (!temp && temp !== 0) return;
-        const marker = (window as any).L.circleMarker(station.coordinates, {
+        const lstTemp = station.lstTemperatures[selectedDate];
+        if (temp === undefined || temp === null) return;
+        const marker = (window as any).L.circleMarker([station.lat, station.lng], {
           radius: 6,
           fillColor: '#4F46E5',
           color: '#312E81',
@@ -199,12 +253,16 @@ const MapContainer: React.FC<MapContainerProps> = ({
           opacity: 1,
           fillOpacity: 0.8
         });
+        const difference = lstTemp !== undefined ? Math.abs(temp - lstTemp) : null;
         marker.bindPopup(`
           <div class="text-sm">
             <div class="font-semibold text-slate-800">${station.name}</div>
             <div class="text-slate-600">Ground Truth: ${temp.toFixed(1)}°C</div>
+            ${lstTemp !== undefined ? `<div class="text-slate-600">LST: ${lstTemp.toFixed(1)}°C</div>` : ''}
+            ${difference !== null ? `<div class="text-slate-500">Δ${difference.toFixed(1)}°C</div>` : ''}
             <div class="text-xs text-slate-500 mt-1">Station ID: ${station.stationId}</div>
-            <div class="text-xs text-slate-500">Elevation: ${station.metadata.elevation}m</div>
+            <div class="text-xs text-slate-500">Type: ${station.type} | Elevation: ${station.elevation}m</div>
+            <div class="text-xs text-slate-500">Accuracy: ${station.accuracy} | Quality: ${station.dataQuality}%</div>
           </div>
         `);
         marker.addTo(layerGroups.groundTruth);
@@ -256,7 +314,7 @@ const MapContainer: React.FC<MapContainerProps> = ({
           {layers.groundTruth && (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-indigo-600 rounded-full" />
-              <span className="text-xs text-slate-600">Weather Stations (23)</span>
+              <span className="text-xs text-slate-600">Weather Stations ({dataset?.groundTruthStations?.length ?? 0})</span>
             </div>
           )}
         </div>
@@ -284,20 +342,6 @@ const MapContainer: React.FC<MapContainerProps> = ({
     </div>
   );
 };
-
-interface GroundTruthStation {
-  stationId: string;
-  name: string;
-  coordinates: [number, number];
-  temperatures: { [date: string]: number };
-  metadata: { type: string; elevation: number };
-}
-
-const mockGroundTruthStations = (): GroundTruthStation[] => [
-  { stationId: 'KCACULVE16', name: 'Culver City', coordinates: [34.0211, -118.3964], temperatures: { '2023-07-12': 30.2, '2023-08-29': 33.6, '2023-09-14': 28.5 }, metadata: { type: 'PWS', elevation: 45 } },
-  { stationId: 'KCALOSAN1032', name: 'Los Angeles Downtown', coordinates: [34.0407, -118.2468], temperatures: { '2023-07-12': 32.4, '2023-08-29': 35.1, '2023-09-14': 29.7 }, metadata: { type: 'PWS', elevation: 92 } },
-  { stationId: 'KCALOSAN977', name: 'Woodland Hills', coordinates: [34.1681, -118.6059], temperatures: { '2023-07-12': 34.2, '2023-08-29': 39.1, '2023-09-14': 31.0 }, metadata: { type: 'PWS', elevation: 289 } }
-];
 
 export default MapContainer;
 

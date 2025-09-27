@@ -16,19 +16,11 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-interface LandCoverCategory {
-  id: string;
-  name: string;
-  area: number;
-  color: string;
-  code: number;
+import type { LandCoverCategory } from '../services/dataset';
+
+interface LandCoverCategoryState extends LandCoverCategory {
   visible: boolean;
   opacity: number;
-  muhiContribution: {
-    canopy40: number;
-    top2percent: number;
-  };
-  description: string;
 }
 
 interface LandCoverOverlayProps {
@@ -37,6 +29,7 @@ interface LandCoverOverlayProps {
   onToggleVisibility: () => void;
   onCategoryToggle?: (categoryId: string) => void;
   onOpacityChange?: (categoryId: string, opacity: number) => void;
+  categories?: LandCoverCategory[];
 }
 
 const LandCoverOverlay: React.FC<LandCoverOverlayProps> = ({
@@ -44,7 +37,8 @@ const LandCoverOverlay: React.FC<LandCoverOverlayProps> = ({
   isVisible,
   onToggleVisibility,
   onCategoryToggle,
-  onOpacityChange
+  onOpacityChange,
+  categories = []
 }) => {
   const [expandedSections, setExpandedSections] = useState({
     categories: true,
@@ -53,89 +47,26 @@ const LandCoverOverlay: React.FC<LandCoverOverlayProps> = ({
     controls: false
   });
 
-  const [selectedCategory, setSelectedCategory] = useState<LandCoverCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<LandCoverCategoryState | null>(null);
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
 
-  // Research-based land cover data from OpenStreetMap-derived classification
-  const [landCoverCategories, setLandCoverCategories] = useState<LandCoverCategory[]>([
-    {
-      id: 'sparse_vegetation',
-      name: 'Sparse Vegetation',
-      area: 8736.90,
-      color: '#9ACD32',
-      code: 1,
+  // Initialize state with real land cover data from props
+  const [landCoverCategories, setLandCoverCategories] = useState<LandCoverCategoryState[]>(() =>
+    categories.map(category => ({
+      ...category,
       visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 0.07, top2percent: 0.66 },
-      description: 'Low-density vegetation, parks with scattered trees, grasslands'
-    },
-    {
-      id: 'dense_vegetation',
-      name: 'Dense Vegetation',
-      area: 14003.01,
-      color: '#228B22',
-      code: 2,
+      opacity: 0.7
+    }))
+  );
+
+  // Update state when categories prop changes
+  React.useEffect(() => {
+    setLandCoverCategories(categories.map(category => ({
+      ...category,
       visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 0.00, top2percent: 0.01 },
-      description: 'Forest canopy, dense urban trees, heavily vegetated areas'
-    },
-    {
-      id: 'vegetated_asphalt',
-      name: 'Vegetated Asphalt',
-      area: 42190.93,
-      color: '#696969',
-      code: 3,
-      visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 0.73, top2percent: 8.08 },
-      description: 'Roads and parking lots with adjacent vegetation'
-    },
-    {
-      id: 'concrete',
-      name: 'Concrete',
-      area: 7211.61,
-      color: '#708090',
-      code: 4,
-      visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 8.50, top2percent: 23.03 },
-      description: 'Concrete surfaces, sidewalks, plazas, industrial areas'
-    },
-    {
-      id: 'water_body',
-      name: 'Water Body',
-      area: 1340.83,
-      color: '#4682B4',
-      code: 5,
-      visible: true,
-      opacity: 0.8,
-      muhiContribution: { canopy40: 0.00, top2percent: 0.00 },
-      description: 'Rivers, lakes, reservoirs, ocean areas'
-    },
-    {
-      id: 'unvegetated_asphalt',
-      name: 'Unvegetated Asphalt',
-      area: 40821.17,
-      color: '#2F4F4F',
-      code: 6,
-      visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 9.07, top2percent: 11.01 },
-      description: 'Pure asphalt roads, highways, large parking areas'
-    },
-    {
-      id: 'buildings',
-      name: 'Buildings',
-      area: 8704.29,
-      color: '#8B4513',
-      code: 7,
-      visible: true,
-      opacity: 0.7,
-      muhiContribution: { canopy40: 3.91, top2percent: 16.46 },
-      description: 'Residential, commercial, and industrial structures'
-    }
-  ]);
+      opacity: 0.7
+    })));
+  }, [categories]);
 
   const totalArea = landCoverCategories.reduce((sum, category) => sum + category.area, 0);
 

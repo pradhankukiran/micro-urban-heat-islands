@@ -10,12 +10,21 @@ import {
   BarChart3
 } from 'lucide-react';
 
+interface QueryFeatureDetail {
+  id?: string | number;
+  thresholdLabel: string;
+  pixelCount: number | null;
+  areaHa: number | null;
+}
+
 interface QueryData {
   lat: number;
   lng: number;
   temperature: number;
   landCover: string;
   muhiStatus: string[];
+  canopyHits: QueryFeatureDetail[];
+  top2Hits: QueryFeatureDetail[];
 }
 
 interface InteractiveQueryProps {
@@ -87,6 +96,13 @@ const InteractiveQuery: React.FC<InteractiveQueryProps> = ({
 
   const hasCanopy = queryData.muhiStatus.some(status => status.toLowerCase().includes('40'));
   const hasTop2 = queryData.muhiStatus.some(status => status.toLowerCase().includes('top 2'));
+  const canopyDetails = queryData.canopyHits ?? [];
+  const top2Details = queryData.top2Hits ?? [];
+  const hasCanopyDetails = canopyDetails.length > 0;
+  const hasTop2Details = top2Details.length > 0;
+  const hasDetailedHits = hasCanopyDetails || hasTop2Details;
+  const formatPixels = (value: number | null) => (value !== null ? value.toLocaleString() : '—');
+  const formatArea = (value: number | null) => (value !== null ? `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha` : null);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -158,7 +174,7 @@ const InteractiveQuery: React.FC<InteractiveQueryProps> = ({
               <span className="text-sm font-medium text-slate-800">{queryData.landCover}</span>
             </div>
             <div className="text-xs text-slate-600 mt-2">
-              Update this value once land-cover layers are integrated.
+              Real-time classification based on land cover polygons.
             </div>
           </div>
 
@@ -187,6 +203,53 @@ const InteractiveQuery: React.FC<InteractiveQueryProps> = ({
                 </div>
               ))}
             </div>
+            {hasDetailedHits && (
+              <div className="mt-4 bg-white border border-slate-200 rounded p-3 space-y-3">
+                {hasCanopyDetails && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold text-red-700">≥ 40°C polygons</p>
+                    {canopyDetails.slice(0, 3).map((detail, index) => {
+                      const areaLabel = formatArea(detail.areaHa);
+                      return (
+                        <div
+                          key={`canopy-${detail.id ?? index}`}
+                          className="flex justify-between text-[11px] text-slate-600"
+                        >
+                          <span className="truncate pr-2">{detail.thresholdLabel}</span>
+                          <span className="whitespace-nowrap">
+                            {formatPixels(detail.pixelCount)}
+                            {areaLabel ? <span className="text-slate-500"> · {areaLabel}</span> : null}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {hasTop2Details && (
+                  <div className={`space-y-1 ${hasCanopyDetails ? 'mt-3' : ''}`}>
+                    <p className="text-[11px] font-semibold text-orange-700">Top 2% polygons</p>
+                    {top2Details.slice(0, 3).map((detail, index) => {
+                      const areaLabel = formatArea(detail.areaHa);
+                      return (
+                        <div
+                          key={`top2-${detail.id ?? index}`}
+                          className="flex justify-between text-[11px] text-slate-600"
+                        >
+                          <span className="truncate pr-2">{detail.thresholdLabel}</span>
+                          <span className="whitespace-nowrap">
+                            {formatPixels(detail.pixelCount)}
+                            {areaLabel ? <span className="text-slate-500"> · {areaLabel}</span> : null}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {(canopyDetails.length > 3 || top2Details.length > 3) && (
+                  <p className="text-[10px] text-slate-500">Showing top 3 polygons for this location.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-blue-50 p-4 border border-blue-200">
